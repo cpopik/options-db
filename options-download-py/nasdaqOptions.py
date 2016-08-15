@@ -7,26 +7,61 @@ import pandas as pd
 class NasdaqOptions(object):
     '''
     Class NasdaqOptions fetches options data from Nasdaq website
-    
+
     User inputs:
         Ticker: ticker
             - Ticker for the underlying
+        Page: page
+            - Page of the underlying chain
     '''
     def __init__(self):
-        self.ticker = ""
+        pass
 
-    def get_options_table(self, ticker):
+    def get_last_page(self, ticker):
+        # Override the ticker
+        self.ticker = ticker
+
+        # Construct the URL
+        '''url = http://www.nasdaq.com/symbol/aapl/option-chain?money=all&dateindex=-1'''
+        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?money=all&dateindex=-1&page=1'
+
+        # Query NASDAQ website
+        try:
+            response = requests.get(url)#, timeout=0.1)
+        # DNS lookup failure
+        except requests.exceptions.ConnectionError as e:
+            print('''Webpage doesn't seem to exist!\n%s''' % e)
+            pass
+        # Timeout failure
+        except requests.exceptions.ConnectTimeout as e:
+            print('''Slow connection!\n%s''' % e)
+            pass
+        # HTTP error
+        except requests.exceptions.HTTPError as e:
+            print('''HTTP error!\n%s''' % e)
+            pass
+
+        # Get webpage content
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Determine actual number of pages to loop over
+        # Get the number of page the option table lies on
+        last_page_raw = soup.find('a', {'id': 'quotes_content_left_lb_LastPage'})
+        last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
+        page_nb = ''.join(last_page)
+        return int(page_nb)
+
+    def get_options_page(self, ticker, page):
         '''
-        - Loop over as many webpages as required to get the complete option table for the
-        option desired
-        - Return a pandas.DataFrame() object 
+        - Download chain for a specific ticker from a specific page
+        - Return a pandas.DataFrame() object
         '''
         # Create an empty pandas.Dataframe object. New data will be appended to
         old_df = pd.DataFrame()
         self.ticker = ticker
 
         # Variables
-        loop = 1        # Loop over webpages starts at 0
+        loop = 1        # Loop over webpages starts at 1
         page_nb = 4     # Get the top of the options table
         flag = 1        # Set a flag that will be used to call get_pager()
         old_rows_nb = 0 # Number of rows so far in the table
@@ -64,14 +99,14 @@ class NasdaqOptions(object):
                 last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
                 page_nb = ''.join(last_page)
                 flag = 0
-            
+
             # Extract table containing the option data from the webpage
             table = soup.find_all('table')[5] # table #4 in the webpage is the one of interest
 
             # Extract option data from table as a list
             elems = table.find_all('td') # Python object
             lst = [elem.text for elem in elems] # Option data as a readable list
-        
+
             # Rearrange data and create a pandas.DataFrame
             arrOld = np.array(lst)
 
@@ -114,14 +149,10 @@ class NasdaqOptions(object):
         headers = ['Date', 'Last', 'Chg', 'Bid', 'Ask', 'Vol', 'OI']
         calls.columns = headers
         puts.columns = headers
-        
+
         return calls, puts
-        
+
 if __name__ == '__main__':
     options = NasdaqOptions()
 
-    calls, puts = options.get_options_table('NLY')
-    
-    calls.to_csv('calls_test.csv')
-    puts.to_csv('puts_test.csv')
-
+    print(options.get_last_page('AAPL'))
