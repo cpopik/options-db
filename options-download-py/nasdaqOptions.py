@@ -3,7 +3,6 @@ import requests
 import re
 import numpy as np
 import pandas as pd
-import json as json
 
 class NasdaqOptions(object):
     '''
@@ -125,5 +124,5 @@ class NasdaqOptions(object):
         return calls, puts
 
 if __name__ == '__main__':
-
+    options = NasdaqOptions()
     print(options.get_options_page('AAPL',1))
