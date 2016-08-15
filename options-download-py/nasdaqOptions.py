@@ -125,15 +125,5 @@ class NasdaqOptions(object):
         return calls, puts
 
 if __name__ == '__main__':
-    options = NasdaqOptions()
-    open_file = open('ticker_list.txt', 'r+')
-    ticker_list = json.loads(open_file.read())
-    open_file.close()
-    
-    for ticker in ticker_list:
-        calls, puts = options.get_options_table(ticker)
-
-#    calls.to_csv('calls_test.csv')
-#    puts.to_csv('puts_test.csv')
 
     print(options.get_options_page('AAPL',1))
