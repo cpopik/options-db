@@ -1,8 +1,16 @@
+# standard requirements
 from bs4 import BeautifulSoup
 import requests
 import re
 import numpy as np
 import pandas as pd
+
+# disable false positive warning
+pd.options.mode.chained_assignment = None  # default='warn'
+
+# date conversion
+from mappingFunctions import *
+import time
 
 class NasdaqOptions(object):
     '''
@@ -14,11 +22,15 @@ class NasdaqOptions(object):
         Page: page
             - Page of the underlying chain
     '''
+
+    # global vars
+    columns = ['date','ticker','underlying','contract','type','strike','expiry','last','bid','ask','volume','openInterest']
+
     def __init__(self):
         '''
         - Initializes the NasdaqOptions instance
         '''
-        pass
+        self.timer = []
 
     def get_last_page(self, ticker):
         '''
@@ -62,6 +74,10 @@ class NasdaqOptions(object):
         - Download chain for a specific ticker from a specific page
         - Return a pandas.DataFrame() object
         '''
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+
         # Override the ticker
         self.ticker = ticker
         # Construct the URL
@@ -83,6 +99,10 @@ class NasdaqOptions(object):
             print('''HTTP error!\n%s''' % e)
             pass
 
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+
         # Get webpage content
         soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -100,29 +120,60 @@ class NasdaqOptions(object):
         arr = np.array([x for x in arrOld if not (len(x.split(' ')) == 2)])
 
         # reshape array
-        reshaped = arr.reshape((len(arr)/16, 16))
+        reshaped = arr.reshape((int(len(arr)/16), 16))
         df = pd.DataFrame(reshaped)
 
-        # Name the column 'Strike'
-        df.rename(columns={df.columns[8]:'Strike'}, inplace=True)
         # Remove extraneous tickers
         df = df[df.ix[:,7] == self.ticker]
 
         ## Split into 2 dataframes (1 for calls and 1 for puts)
-        calls = df.ix[:,0:7]
-        puts = df.ix[:,9:16] # Slicing is not incluse of the last column
-
-        # Set 'Strike' column as dataframe index
-        calls = calls.set_index(df['Strike'])
-        puts = puts.set_index(df['Strike'])
+        calls = df.ix[:,0:8]
+        puts = df.ix[:,8:16] # Slicing is not incluse of the last column
 
         ## Headers names
-        headers = ['Date', 'Last', 'Chg', 'Bid', 'Ask', 'Vol', 'OI']
-        calls.columns = headers
-        puts.columns = headers
+        calls.columns = ['expiry-pd', 'last', 'chg', 'bid', 'ask', 'volume', 'openInterest','ticker', 'strike']
+        puts.columns = ['strike', 'expiry-pd', 'last', 'chg', 'bid', 'ask', 'volume', 'openInterest']
 
-        return calls, puts
+        # Set 'Strike' column as dataframe index
+        calls['type'] = 'CALL'
+        puts['type'] = 'PUT'
+
+        # Join calls and puts dfs
+        output = pd.concat([calls, puts])
+
+        # Change to numeric
+        output['strike'] = pd.to_numeric(output['strike'])
+
+        # expiry in matlab format
+        output['expiry-pd'] = pd.to_datetime(output['expiry-pd'])
+        output['unix_time'] = output['expiry-pd'].map(py_to_unix)
+        output['expiry'] = output['expiry-pd'].map(py_to_mat)
+
+        # adding additional columns
+        output['ticker'] = self.ticker
+        output['date'] = datenum_today()
+        output['underlying'] = float(str(soup.find('div', {'id': 'qwidget_lastsale'})).split('$')[1].split('<')[0]) # find the stock price
+
+        # generating contract name
+        output['contract_time'] = output['unix_time'].map(generate_contract_time)
+        output['contract_type'] = output['type'].map(first_character)
+        output['contract_strike'] = output['strike']*1000
+        output['contract_strike'] = output['contract_strike'].astype('int')
+        output['contract_strike'] = output['contract_strike'].astype('str')
+        output['contract_strike'] = output['contract_strike'].apply(lambda x: x.zfill(8))
+        output['contract'] = output['ticker'] + output['contract_time'] + output['contract_type'] + output['contract_strike']
+
+        # keep only columns we need
+        output = output[NasdaqOptions.columns]
+
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+
+        return output
 
 if __name__ == '__main__':
     options = NasdaqOptions()
-    print(options.get_options_page('AAPL',1))
+    options.get_options_page('AAPL',1)
+    print('\nPage load: ', options.timer[1]-options.timer[0])
+    print('Data prep: ', options.timer[2]-options.timer[1], '\n')
