@@ -3,6 +3,7 @@ import requests
 import re
 import numpy as np
 import pandas as pd
+import json as json
 
 class NasdaqOptions(object):
     '''
@@ -119,9 +120,13 @@ class NasdaqOptions(object):
         
 if __name__ == '__main__':
     options = NasdaqOptions()
-
-    calls, puts = options.get_options_table('NLY')
+    open_file = open('ticker_list.txt', 'r+')
+    ticker_list = json.loads(open_file.read())
+    open_file.close()
     
-    calls.to_csv('calls_test.csv')
-    puts.to_csv('puts_test.csv')
+    for ticker in ticker_list:
+        calls, puts = options.get_options_table(ticker)
+    
+#    calls.to_csv('calls_test.csv')
+#    puts.to_csv('puts_test.csv')
 
