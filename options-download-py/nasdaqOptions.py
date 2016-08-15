@@ -5,12 +5,12 @@ import re
 import numpy as np
 import pandas as pd
 
-# disable false positive warning
-pd.options.mode.chained_assignment = None  # default='warn'
-
 # date conversion
 from mappingFunctions import *
 import time
+
+# disable false positive warning
+pd.options.mode.chained_assignment = None  # default='warn'
 
 class NasdaqOptions(object):
     '''
@@ -174,11 +174,6 @@ class NasdaqOptions(object):
 
 if __name__ == '__main__':
     options = NasdaqOptions()
-<<<<<<< HEAD
     options.get_options_page('AAPL',1)
     print('\nPage load: ', options.timer[1]-options.timer[0])
     print('Data prep: ', options.timer[2]-options.timer[1], '\n')
-=======
-    print(options.get_options_page('AAPL',1))
-
->>>>>>> 913b9bb5170fdbb0f1ce2548874b42de8fccad99
