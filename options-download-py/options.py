@@ -28,7 +28,7 @@ def getYieldCurve():
 
     return f2(nRange)
 
-def bsVol(row):
+def bsVol(row, yields):
     if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
         mid = (float(row['bid']) + float(row['ask']))/2
         cp_flag = row['type']
@@ -57,7 +57,7 @@ def bsVol(row):
     else:
         return None
 
-def bsDelta(row):
+def bsDelta(row, yields):
     if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
         mid = (float(row['bid']) + float(row['ask']))/2
         cp_flag = row['type']
@@ -77,7 +77,7 @@ def bsDelta(row):
     else:
         return None
 
-def bsGamma(row):
+def bsGamma(row, yields):
     if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
         mid = (float(row['bid']) + float(row['ask']))/2
         cp_flag = row['type']
@@ -94,7 +94,7 @@ def bsGamma(row):
     else:
         return None
 
-def bsTheta(row):
+def bsTheta(row, yields):
     if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
         mid = (float(row['bid']) + float(row['ask']))/2
         cp_flag = row['type']
@@ -115,7 +115,7 @@ def bsTheta(row):
     else:
         return None
 
-def bsVega(row):
+def bsVega(row, yields):
     if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
         mid = (float(row['bid']) + float(row['ask']))/2
         cp_flag = row['type']
@@ -132,7 +132,7 @@ def bsVega(row):
     else:
         return None
 
-def bsRho(row):
+def bsRho(row, yields):
     if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
         mid = (float(row['bid']) + float(row['ask']))/2
         cp_flag = row['type']
@@ -171,12 +171,10 @@ def main():
     q = 0.00
     cp = 'CALL' # call option
 
-    global yields
     yields = getYieldCurve()
-
     row = {'bid': 0.52, 'ask': 0.52, 'type': 'CALL', 'strike': K, 'underlying': S, 'expiry': 736565, 'ticker': 'AAPL', 'bsVol': 0.12}
 
-    y = bsDelta(row)
+    y = bsVol(row, yields)
     print(y)
 
 if __name__ == '__main__':

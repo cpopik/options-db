@@ -144,7 +144,7 @@ def downloadOptionsPage(ticker, url):
     output['contract'] = output['ticker'] + output['contract_time'] + output['contract_type'] + output['contract_strike']
 
     # keep only columns we need and replace empty
-    output = output[NasdaqOptions.columns]
+    output = output[columns]
     output = output.replace(r'\s+( +\.)|#',np.nan,regex=True).replace('',np.nan)
 
     # add unique key
@@ -152,11 +152,12 @@ def downloadOptionsPage(ticker, url):
     output = output.set_index('recordID')
 
     # calculate greeks
-    output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
-    output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
-    output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
-    output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
-    output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
+    yields = getYieldCurve()
+    output['bsVol'] = output.apply(lambda row: bsVol(row, yields), axis=1)
+    output['bsDelta'] = output.apply(lambda row: bsDelta(row, yields), axis=1)
+    output['bsGamma'] = output.apply(lambda row: bsGamma(row, yields), axis=1)
+    output['bsTheta'] = output.apply(lambda row: bsTheta(row, yields), axis=1)
+    output['bsVega'] = output.apply(lambda row: bsVega(row, yields), axis=1)
 
     return output
 
@@ -165,9 +166,9 @@ def uploadToSQL(output):
     try:
         output.to_sql('$'+self.ticker.replace('-','').upper(), self.conn, flavor='mysql', schema=NasdaqOptions.db, if_exists='append', index=True)
         return True
-    else:
+    except:
         return False
 
 if __name__ == '__main__':
-    x = options.upload_options_page('AAPL','http://www.nasdaq.com/symbol/AAPL/option-chain?&dateindex=-1&page=1')
+    x = downloadOptionsPage('NLY','http://www.nasdaq.com/symbol/NLY/option-chain?&dateindex=-1&page=1')
     print(x)
