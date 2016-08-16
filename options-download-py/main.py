@@ -38,8 +38,7 @@ def worker():
             print('Calculated:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
 
             status = uploadToSQL(ticker, df)
-            print('Uploaded:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
-            print('   with upload status: ', status)
+            print('Uploaded:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name, '\t', status)
 
 
         # tell the queue that the task is done
@@ -68,8 +67,8 @@ def main():
 
     # starting up
     print("Adding processes...\n")
-    print('Action \t\t Page \t\t\t\t\t\t\t\t\t Timestamp \t Process ID')
-    print('----------- \t -------------------------------------------------------------------- \t ---------- \t -----------')
+    print('Action \t\t Page \t\t\t\t\t\t\t\t\t Timestamp \t Process ID \t Status')
+    print('----------- \t -------------------------------------------------------------------- \t ---------- \t ----------- \t -----------')
 
     for ticker in tickers:
         q.put([0, ticker])
