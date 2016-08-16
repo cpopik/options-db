@@ -4,9 +4,10 @@ import requests
 import re
 import numpy as np
 import pandas as pd
+import pymysql
 
 # date conversion
-from mappingFunctions import *
+from functions import *
 import time
 
 # custom classes
@@ -28,13 +29,21 @@ class NasdaqOptions(object):
 
     # global vars
     columns = ['date','ticker','underlying','contract','type','strike','expiry','last','bid','ask','volume','openInterest']
+    host = 'derivs.xyz'
+    port = 3306
+    user = 'admin'
+    passwd = 'servire87'
+    db = 'options_v2'
 
     def __init__(self):
-        '''
-        - Initializes the NasdaqOptions instance
-        '''
-        self.timer = []
+
+
         self.optionsCalc = Options()
+        self.conn = pymysql.connect(host=NasdaqOptions.host,
+                                    port=NasdaqOptions.port,
+                                    user=NasdaqOptions.user,
+                                    passwd=NasdaqOptions.passwd,
+                                    db=NasdaqOptions.db)
 
     def get_last_page(self, ticker):
         '''
@@ -72,15 +81,11 @@ class NasdaqOptions(object):
         last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
         page_nb = ''.join(last_page)
         return ticker, int(page_nb)
-
-    def get_options_page(self, ticker, page):
+    def upload_options_page(self, ticker, page):
         '''
         - Download chain for a specific ticker from a specific page
         - Return a pandas.DataFrame() object
         '''
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
 
         # Override the ticker
         self.ticker = ticker
@@ -102,10 +107,6 @@ class NasdaqOptions(object):
         except requests.exceptions.HTTPError as e:
             print('''HTTP error!\n%s''' % e)
             pass
-
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
 
         # Get webpage content
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -170,45 +171,29 @@ class NasdaqOptions(object):
         # keep only columns we need
         output = output[NasdaqOptions.columns]
 
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
-
         # calculating greeks
         output = output.replace(r'\s+( +\.)|#',np.nan,regex=True).replace('',np.nan)
         output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
-
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
         output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
         output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
         output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
         output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
-        ## --------------------------- ##
-        self.timer.append(time.time())
-        ## --------------------------- ##
+
+        # add unique key
+        output['recordID'] = output['date'].map(str) + output['contract']
+        output = output.set_index('recordID')
+
+        # upload to SQL database
+        output.to_sql('$'+self.ticker.replace('-','').upper(),
+                        self.conn,
+                        flavor='mysql',
+                        schema=NasdaqOptions.db,
+                        if_exists='append',
+                        index=True)
 
         return output
 
 if __name__ == '__main__':
     options = NasdaqOptions()
-    x = options.get_options_page('AAPL',1)
-    print('\nPage load: ', options.timer[1]-options.timer[0])
-    print('Data prep: ', options.timer[2]-options.timer[1])
-    print('Vol prep: ', options.timer[3]-options.timer[2])
-    print('Delta prep: ', options.timer[4]-options.timer[3])
-    print('Gamma prep: ', options.timer[5]-options.timer[4])
-    print('Theta prep: ', options.timer[6]-options.timer[5])
-    print('Vega prep: ', options.timer[7]-options.timer[6])
-    print('Total: ', options.timer[7]-options.timer[0])
-    print("\n")
+    x = options.upload_options_page('AAPL',1)
+    print(x)

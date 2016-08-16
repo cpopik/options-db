@@ -2,7 +2,7 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from mappingFunctions import *
+from functions import *
 from scipy.stats import norm
 from scipy.interpolate import interp1d
 from math import log, sqrt, exp
@@ -14,7 +14,7 @@ N = norm.cdf
 
 DAY_COUNT = float(360) # maybe need to switch to 252. keep float in here!!
 START_VOL = .25
-MAX_ITERATIONS = 10
+MAX_ITERATIONS = 25
 PRECISION = 1.0e-3
 
 class Options(object):
@@ -35,7 +35,6 @@ class Options(object):
         nRange = np.linspace(0, 800, 800)
         f2 = interp1d(yieldDays, yieldPoints, kind='linear')
         self.yields = f2(nRange) # convieniently indexed by days
-
     def bsVol(self, row):
         if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
             mid = (float(row['bid']) + float(row['ask']))/2
@@ -64,7 +63,6 @@ class Options(object):
             return v
         else:
             return None
-
     def bsDelta(self, row):
         if not(pd.isnull(row['bid'])) and not (pd.isnull(row['ask'])):
             mid = (float(row['bid']) + float(row['ask']))/2
