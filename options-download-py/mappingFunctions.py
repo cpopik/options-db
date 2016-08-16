@@ -23,10 +23,5 @@ def datenum_today():
 def first_character(x):
     return x[0]
 
-def format_strike(x):
-    x = x*1000
-    xLen = len(str(x))
-    return (8-xLen)*"0" + str(x)
-
 if __name__ == "__main__":
     print(format_strike(10))
