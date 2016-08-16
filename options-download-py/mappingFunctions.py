@@ -24,4 +24,4 @@ def first_character(x):
     return x[0]
 
 if __name__ == "__main__":
-    print(format_strike(10))
+    print(datenum_today())

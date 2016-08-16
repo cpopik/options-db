@@ -9,6 +9,9 @@ import pandas as pd
 from mappingFunctions import *
 import time
 
+# custom classes
+from options import Options
+
 # disable false positive warning
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -31,6 +34,7 @@ class NasdaqOptions(object):
         - Initializes the NasdaqOptions instance
         '''
         self.timer = []
+        self.optionsCalc = Options()
 
     def get_last_page(self, ticker):
         '''
@@ -81,7 +85,7 @@ class NasdaqOptions(object):
         # Override the ticker
         self.ticker = ticker
         # Construct the URL
-        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?money=all&dateindex=-1&page='+str(page)
+        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?&dateindex=-1&page='+str(page)
 
         # Query NASDAQ website
         try:
@@ -170,10 +174,41 @@ class NasdaqOptions(object):
         self.timer.append(time.time())
         ## --------------------------- ##
 
+        # calculating greeks
+        output = output.replace(r'\s+( +\.)|#',np.nan,regex=True).replace('',np.nan)
+        output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
+
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+        output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+        output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+        output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+        output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
+        ## --------------------------- ##
+        self.timer.append(time.time())
+        ## --------------------------- ##
+
         return output
 
 if __name__ == '__main__':
     options = NasdaqOptions()
-    options.get_options_page('AAPL',1)
+    x = options.get_options_page('AAPL',1)
     print('\nPage load: ', options.timer[1]-options.timer[0])
-    print('Data prep: ', options.timer[2]-options.timer[1], '\n')
+    print('Data prep: ', options.timer[2]-options.timer[1])
+    print('Vol prep: ', options.timer[3]-options.timer[2])
+    print('Delta prep: ', options.timer[4]-options.timer[3])
+    print('Gamma prep: ', options.timer[5]-options.timer[4])
+    print('Theta prep: ', options.timer[6]-options.timer[5])
+    print('Vega prep: ', options.timer[7]-options.timer[6])
+    print('Total: ', options.timer[7]-options.timer[0])
+    print("\n")
