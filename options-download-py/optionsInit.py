@@ -21,7 +21,7 @@ def url_builder(ticker, last_page):
         url_dict[ticker].append('http://www.nasdaq.com/symbol/' + ticker + '/option-chain?money=all&dateindex=-1&page='+str(page))
 
 def get_ticker_page(q, ticker, page):
-    options.get_options_page(ticker, page)
+    options.upload_options_page(ticker, page)
     
 if __name__ == '__main__':
     """ Read the relevant tickers from the ticker_list text file """

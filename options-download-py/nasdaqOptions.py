@@ -5,6 +5,7 @@ import re
 import numpy as np
 import pandas as pd
 import pymysql
+import threading
 
 # date conversion
 from functions import *
@@ -81,7 +82,7 @@ class NasdaqOptions(object):
         last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
         page_nb = ''.join(last_page)
         return ticker, int(page_nb)
-    def upload_options_page(self, ticker, page):
+    def upload_options_page(self, ticker, url):
         '''
         - Download chain for a specific ticker from a specific page
         - Return a pandas.DataFrame() object
@@ -90,7 +91,7 @@ class NasdaqOptions(object):
         # Override the ticker
         self.ticker = ticker
         # Construct the URL
-        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?&dateindex=-1&page='+str(page)
+#        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?&dateindex=-1&page='+str(page)
 
         # Query NASDAQ website
         try:
@@ -173,27 +174,55 @@ class NasdaqOptions(object):
 
         # calculating greeks
         output = output.replace(r'\s+( +\.)|#',np.nan,regex=True).replace('',np.nan)
-        output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
-        output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
-        output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
-        output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
-        output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
+        label_list = ['bsVol', 'bsDelta', 'bsGamma', 'bsTheta', 'bsVega']
+        threads = []
+        for label in label_list:
+            thread = threading.Thread(target = self.greek_calc, args = (label, output))
+            threads.append(thread)
+            thread.daemon = True
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+        
+        print 'bsVol', output['bsVol']
+        
+         
+#        output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
+#        output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
+#        output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
+#        output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
+#        output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
 
         # add unique key
-        output['recordID'] = output['date'].map(str) + output['contract']
-        output = output.set_index('recordID')
-
-        # upload to SQL database
-        output.to_sql('$'+self.ticker.replace('-','').upper(),
-                        self.conn,
-                        flavor='mysql',
-                        schema=NasdaqOptions.db,
-                        if_exists='append',
-                        index=True)
+#        output['recordID'] = output['date'].map(str) + output['contract']
+#        output = output.set_index('recordID')
+#
+#        # upload to SQL database
+#        output.to_sql('$'+self.ticker.replace('-','').upper(),
+#                        self.conn,
+#                        flavor='mysql',
+#                        schema=NasdaqOptions.db,
+#                        if_exists='append',
+#                        index=True)
 
         return output
+    
+    def greek_calc(self, label, output):
+        if label == 'bsVol':
+            output[label] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
+        elif label == 'bsDelta':
+            output[label] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
+        elif label == 'bsGamma':
+            output[label] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
+        elif label == 'bsTheta':
+            output[label] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
+        elif label == 'bsVega':
+            output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
+        else:
+            print "Error: incorrect label presented"
 
 if __name__ == '__main__':
     options = NasdaqOptions()
-    x = options.upload_options_page('AAPL',1)
+    x = options.upload_options_page('AAPL','http://www.nasdaq.com/symbol/AAPL/option-chain?&dateindex=-1&page=1')
     print(x)
