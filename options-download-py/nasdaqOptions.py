@@ -1,228 +1,173 @@
 # standard requirements
-from bs4 import BeautifulSoup
 import requests
 import re
 import numpy as np
 import pandas as pd
 import pymysql
 import threading
+from bs4 import BeautifulSoup
 
 # date conversion
 from functions import *
 import time
 
 # custom classes
-from options import Options
+from options import *
 
 # disable false positive warning
 pd.options.mode.chained_assignment = None  # default='warn'
 
-class NasdaqOptions(object):
+# global vars
+columns = ['date','ticker','underlying','contract','type','strike','expiry','last','bid','ask','volume','openInterest']
+host = 'derivs.xyz'
+port = 3306
+user = 'admin'
+passwd = 'servire87'
+db = 'options_v2'
+conn = pymysql.connect(host=host, port=port, user=user, passwd=passwd, db=db)
+
+def getLastPage(ticker):
     '''
-    Class NasdaqOptions fetches options data from Nasdaq website
-
-    User inputs:
-        Ticker: ticker
-            - Ticker for the underlying
-        Page: page
-            - Page of the underlying chain
+    - Determine the last option chain page for a specific ticker
+    - Return an int object
     '''
 
-    # global vars
-    columns = ['date','ticker','underlying','contract','type','strike','expiry','last','bid','ask','volume','openInterest']
-    host = 'derivs.xyz'
-    port = 3306
-    user = 'admin'
-    passwd = 'servire87'
-    db = 'options_v2'
+    # Construct the URL
+    url = 'http://www.nasdaq.com/symbol/' + ticker + '/option-chain?money=all&dateindex=-1&page=1'
 
-    def __init__(self):
+    # Query NASDAQ website
+    try:
+        response = requests.get(url)#, timeout=0.1)
+    # DNS lookup failure
+    except requests.exceptions.ConnectionError as e:
+        print('''Webpage doesn't seem to exist!\n%s''' % e)
+        pass
+    # Timeout failure
+    except requests.exceptions.ConnectTimeout as e:
+        print('''Slow connection!\n%s''' % e)
+        pass
+    # HTTP error
+    except requests.exceptions.HTTPError as e:
+        print('''HTTP error!\n%s''' % e)
+        pass
 
+    # Get webpage content
+    soup = BeautifulSoup(response.content, 'html.parser')
 
-        self.optionsCalc = Options()
-        self.conn = pymysql.connect(host=NasdaqOptions.host,
-                                    port=NasdaqOptions.port,
-                                    user=NasdaqOptions.user,
-                                    passwd=NasdaqOptions.passwd,
-                                    db=NasdaqOptions.db)
+    # Determine actual number of pages to loop over
+    # Get the number of page the option table lies on
+    last_page_raw = soup.find('a', {'id': 'quotes_content_left_lb_LastPage'})
+    last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
+    page_nb = ''.join(last_page)
 
-    def get_last_page(self, ticker):
-        '''
-        - Determine the last option chain page for a specific ticker
-        - Return an int object
-        '''
-        # Override the ticker
-        self.ticker = ticker
+    return ticker, int(pg_nb)
 
-        # Construct the URL
-        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?money=all&dateindex=-1&page=1'
+def downloadOptionsPage(ticker, url):
+    '''
+    - Download chain for a specific ticker from a specific page
+    - Return a pandas.DataFrame() object
+    '''
+    # Query NASDAQ website
+    try:
+        response = requests.get(url)#, timeout=0.1)
+    # DNS lookup failure
+    except requests.exceptions.ConnectionError as e:
+        print('''Webpage doesn't seem to exist!\n%s''' % e)
+        pass
+    # Timeout failure
+    except requests.exceptions.ConnectTimeout as e:
+        print('''Slow connection!\n%s''' % e)
+        pass
+    # HTTP error
+    except requests.exceptions.HTTPError as e:
+        print('''HTTP error!\n%s''' % e)
+        pass
 
-        # Query NASDAQ website
-        try:
-            response = requests.get(url)#, timeout=0.1)
-        # DNS lookup failure
-        except requests.exceptions.ConnectionError as e:
-            print('''Webpage doesn't seem to exist!\n%s''' % e)
-            pass
-        # Timeout failure
-        except requests.exceptions.ConnectTimeout as e:
-            print('''Slow connection!\n%s''' % e)
-            pass
-        # HTTP error
-        except requests.exceptions.HTTPError as e:
-            print('''HTTP error!\n%s''' % e)
-            pass
+    # Get webpage content
+    soup = BeautifulSoup(response.content, 'html.parser')
 
-        # Get webpage content
-        soup = BeautifulSoup(response.content, 'html.parser')
+    # Extract table containing the option data from the webpage
+    table = soup.find_all('table')[5] # table #5 in the webpage is the one of interest
 
-        # Determine actual number of pages to loop over
-        # Get the number of page the option table lies on
-        last_page_raw = soup.find('a', {'id': 'quotes_content_left_lb_LastPage'})
-        last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
-        page_nb = ''.join(last_page)
-        return ticker, int(page_nb)
-    def upload_options_page(self, ticker, url):
-        '''
-        - Download chain for a specific ticker from a specific page
-        - Return a pandas.DataFrame() object
-        '''
+    # Extract option data from table as a list
+    elems = table.find_all('td') # Python object
+    lst = [elem.text for elem in elems] # Option data as a readable list
 
-        # Override the ticker
-        self.ticker = ticker
-        # Construct the URL
-#        url = 'http://www.nasdaq.com/symbol/' + self.ticker + '/option-chain?&dateindex=-1&page='+str(page)
+    # Rearrange data and create a pandas.DataFrame
+    arrOld = np.array(lst)
 
-        # Query NASDAQ website
-        try:
-            response = requests.get(url)#, timeout=0.1)
-        # DNS lookup failure
-        except requests.exceptions.ConnectionError as e:
-            print('''Webpage doesn't seem to exist!\n%s''' % e)
-            pass
-        # Timeout failure
-        except requests.exceptions.ConnectTimeout as e:
-            print('''Slow connection!\n%s''' % e)
-            pass
-        # HTTP error
-        except requests.exceptions.HTTPError as e:
-            print('''HTTP error!\n%s''' % e)
-            pass
+    # Remove month headers
+    arr = np.array([x for x in arrOld if not (len(x.split(' ')) == 2)])
 
-        # Get webpage content
-        soup = BeautifulSoup(response.content, 'html.parser')
+    # reshape array
+    reshaped = arr.reshape((int(len(arr)/16), 16))
+    df = pd.DataFrame(reshaped)
 
-        # Extract table containing the option data from the webpage
-        table = soup.find_all('table')[5] # table #5 in the webpage is the one of interest
+    # Remove extraneous tickers
+    df = df[df.ix[:,7] == ticker]
 
-        # Extract option data from table as a list
-        elems = table.find_all('td') # Python object
-        lst = [elem.text for elem in elems] # Option data as a readable list
+    ## Split into 2 dataframes (1 for calls and 1 for puts)
+    calls = df.ix[:,0:8]
+    puts = df.ix[:,8:16] # Slicing is not incluse of the last column
 
-        # Rearrange data and create a pandas.DataFrame
-        arrOld = np.array(lst)
+    ## Headers names
+    calls.columns = ['expiry-pd', 'last', 'chg', 'bid', 'ask', 'volume', 'openInterest','ticker', 'strike']
+    puts.columns = ['strike', 'expiry-pd', 'last', 'chg', 'bid', 'ask', 'volume', 'openInterest']
 
-        # Remove month headers
-        arr = np.array([x for x in arrOld if not (len(x.split(' ')) == 2)])
+    # Set 'Strike' column as dataframe index
+    calls['type'] = 'CALL'
+    puts['type'] = 'PUT'
 
-        # reshape array
-        reshaped = arr.reshape((int(len(arr)/16), 16))
-        df = pd.DataFrame(reshaped)
+    # Join calls and puts dfs
+    output = pd.concat([calls, puts])
 
-        # Remove extraneous tickers
-        df = df[df.ix[:,7] == self.ticker]
+    # Change to numeric
+    output['strike'] = pd.to_numeric(output['strike'])
 
-        ## Split into 2 dataframes (1 for calls and 1 for puts)
-        calls = df.ix[:,0:8]
-        puts = df.ix[:,8:16] # Slicing is not incluse of the last column
+    # expiry in matlab format
+    output['expiry-pd'] = pd.to_datetime(output['expiry-pd'])
+    output['unix_time'] = output['expiry-pd'].map(py_to_unix)
+    output['expiry'] = output['expiry-pd'].map(py_to_mat)
 
-        ## Headers names
-        calls.columns = ['expiry-pd', 'last', 'chg', 'bid', 'ask', 'volume', 'openInterest','ticker', 'strike']
-        puts.columns = ['strike', 'expiry-pd', 'last', 'chg', 'bid', 'ask', 'volume', 'openInterest']
+    # adding additional columns
+    output['ticker'] = ticker
+    output['date'] = datenum_today()
+    output['underlying'] = float(str(soup.find('div', {'id': 'qwidget_lastsale'})).split('$')[1].split('<')[0]) # find the stock price
 
-        # Set 'Strike' column as dataframe index
-        calls['type'] = 'CALL'
-        puts['type'] = 'PUT'
+    # generating contract name
+    output['contract_time'] = output['unix_time'].map(generate_contract_time)
+    output['contract_type'] = output['type'].map(first_character)
+    output['contract_strike'] = output['strike']*1000
+    output['contract_strike'] = output['contract_strike'].astype('int')
+    output['contract_strike'] = output['contract_strike'].astype('str')
+    output['contract_strike'] = output['contract_strike'].apply(lambda x: x.zfill(8))
+    output['contract'] = output['ticker'] + output['contract_time'] + output['contract_type'] + output['contract_strike']
 
-        # Join calls and puts dfs
-        output = pd.concat([calls, puts])
+    # keep only columns we need and replace empty
+    output = output[NasdaqOptions.columns]
+    output = output.replace(r'\s+( +\.)|#',np.nan,regex=True).replace('',np.nan)
 
-        # Change to numeric
-        output['strike'] = pd.to_numeric(output['strike'])
+    # add unique key
+    output['recordID'] = output['date'].map(str) + output['contract']
+    output = output.set_index('recordID')
 
-        # expiry in matlab format
-        output['expiry-pd'] = pd.to_datetime(output['expiry-pd'])
-        output['unix_time'] = output['expiry-pd'].map(py_to_unix)
-        output['expiry'] = output['expiry-pd'].map(py_to_mat)
+    # calculate greeks
+    output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
+    output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
+    output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
+    output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
+    output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
 
-        # adding additional columns
-        output['ticker'] = self.ticker
-        output['date'] = datenum_today()
-        output['underlying'] = float(str(soup.find('div', {'id': 'qwidget_lastsale'})).split('$')[1].split('<')[0]) # find the stock price
+    return output
 
-        # generating contract name
-        output['contract_time'] = output['unix_time'].map(generate_contract_time)
-        output['contract_type'] = output['type'].map(first_character)
-        output['contract_strike'] = output['strike']*1000
-        output['contract_strike'] = output['contract_strike'].astype('int')
-        output['contract_strike'] = output['contract_strike'].astype('str')
-        output['contract_strike'] = output['contract_strike'].apply(lambda x: x.zfill(8))
-        output['contract'] = output['ticker'] + output['contract_time'] + output['contract_type'] + output['contract_strike']
-
-        # keep only columns we need
-        output = output[NasdaqOptions.columns]
-
-        # calculating greeks
-        output = output.replace(r'\s+( +\.)|#',np.nan,regex=True).replace('',np.nan)
-        label_list = ['bsVol', 'bsDelta', 'bsGamma', 'bsTheta', 'bsVega']
-        threads = []
-        for label in label_list:
-            thread = threading.Thread(target = self.greek_calc, args = (label, output))
-            threads.append(thread)
-            thread.daemon = True
-            thread.start()
-        
-        for thread in threads:
-            thread.join()
-        
-        print 'bsVol', output['bsVol']
-        
-         
-#        output['bsVol'] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
-#        output['bsDelta'] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
-#        output['bsGamma'] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
-#        output['bsTheta'] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
-#        output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
-
-        # add unique key
-#        output['recordID'] = output['date'].map(str) + output['contract']
-#        output = output.set_index('recordID')
-#
-#        # upload to SQL database
-#        output.to_sql('$'+self.ticker.replace('-','').upper(),
-#                        self.conn,
-#                        flavor='mysql',
-#                        schema=NasdaqOptions.db,
-#                        if_exists='append',
-#                        index=True)
-
-        return output
-    
-    def greek_calc(self, label, output):
-        if label == 'bsVol':
-            output[label] = output.apply(lambda row: self.optionsCalc.bsVol(row), axis=1)
-        elif label == 'bsDelta':
-            output[label] = output.apply(lambda row: self.optionsCalc.bsDelta(row), axis=1)
-        elif label == 'bsGamma':
-            output[label] = output.apply(lambda row: self.optionsCalc.bsGamma(row), axis=1)
-        elif label == 'bsTheta':
-            output[label] = output.apply(lambda row: self.optionsCalc.bsTheta(row), axis=1)
-        elif label == 'bsVega':
-            output['bsVega'] = output.apply(lambda row: self.optionsCalc.bsVega(row), axis=1)
-        else:
-            print "Error: incorrect label presented"
+def uploadToSQL(output):
+    # upload to SQL database
+    try:
+        output.to_sql('$'+self.ticker.replace('-','').upper(), self.conn, flavor='mysql', schema=NasdaqOptions.db, if_exists='append', index=True)
+        return True
+    else:
+        return False
 
 if __name__ == '__main__':
-    options = NasdaqOptions()
     x = options.upload_options_page('AAPL','http://www.nasdaq.com/symbol/AAPL/option-chain?&dateindex=-1&page=1')
     print(x)
