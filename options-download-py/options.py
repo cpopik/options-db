@@ -51,6 +51,11 @@ def bsVol(row, yields):
 
             if (abs(diff) < PRECISION):
                 return v
+
+            # set minimum vega for OTM options
+            if vega < .01:
+                vega = .01
+
             v = v + diff/vega # f(x) / f'(x)
         # value wasn't found, return best guess so far
         return v

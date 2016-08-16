@@ -60,7 +60,7 @@ def getLastPage(ticker):
     last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
     page_nb = ''.join(last_page)
 
-    return ticker, int(pg_nb)
+    return ticker, int(page_nb)
 
 def downloadOptionsPage(ticker, url):
     '''
