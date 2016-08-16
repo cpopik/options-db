@@ -33,7 +33,7 @@ def getLastPage(ticker):
     '''
 
     # Construct the URL
-    url = 'http://www.nasdaq.com/symbol/' + ticker + '/option-chain?money=all&dateindex=-1&page=1'
+    url = 'http://www.nasdaq.com/symbol/' + ticker + '/option-chain?dateindex=-1&page=1'
 
     # Query NASDAQ website
     try:
@@ -60,7 +60,12 @@ def getLastPage(ticker):
     last_page = re.findall(pattern='(?:page=)(\d+)', string=str(last_page_raw))
     page_nb = ''.join(last_page)
 
-    return ticker, int(page_nb)
+    try:
+        page = int(page_nb)
+    except:
+        page = 1
+
+    return ticker, page
 
 def downloadOptionsPage(ticker, url):
     '''
@@ -164,11 +169,11 @@ def downloadOptionsPage(ticker, url):
 def uploadToSQL(output):
     # upload to SQL database
     try:
-        output.to_sql('$'+self.ticker.replace('-','').upper(), self.conn, flavor='mysql', schema=NasdaqOptions.db, if_exists='append', index=True)
-        return True
+        output.to_sql('$'+self.ticker.replace('-','').upper(), conn, flavor='mysql', schema=db, if_exists='append', index=True)
+        return 1
     except:
-        return False
+        return 0
 
 if __name__ == '__main__':
-    x = downloadOptionsPage('NLY','http://www.nasdaq.com/symbol/NLY/option-chain?&dateindex=-1&page=1')
+    x = getLastPage("NLY")
     print(x)

@@ -4,7 +4,7 @@
 """
 
 from nasdaqOptions import *
-from multiprocessing import Process, JoinableQueue, cpu_count
+from multiprocessing import Process, JoinableQueue, cpu_count, current_process
 import json
 import time
 
@@ -16,24 +16,32 @@ def worker():
     # 0: get last page and add URL to queue
     # 1: get dataset from queue and ?upload?
 
-    while not q.empty():
+    while True:
         task = q.get()
 
-        if task[0] == 0:
+        if task is None:
+            break
+        elif task[0] == 0:
             ticker = task[1]
             ticker, lastPage = getLastPage(ticker)  # should remove ticker in future versions
             # adds to global list all the necessary pages
             for page in range(1, lastPage+1):
                 # add a task with type 1 to the queue
-                url = 'http://www.nasdaq.com/symbol/' + ticker + '/option-chain?&dateindex=-1&page='+str(page)
+                url = 'http://www.nasdaq.com/symbol/' + ticker + '/option-chain?dateindex=-1&page='+str(page)
                 q.put([1, ticker, url])
-                print('Added: ', url, '\t\t\t', time.strftime('%H:%M:%S'))
-
+                print('Queued:\t\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
         elif task[0] == 1:
             ticker = task[1]
             url = task[2]
-            downloadOptionsPage(ticker, url)
-            print('Uploaded: ', url, '\t\t\t', time.strftime('%H:%M:%S'))
+            print('Starting:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
+
+            df = downloadOptionsPage(ticker, url)
+            print('Calculated:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
+
+            status = uploadToSQL(df)
+            print('Uploaded:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
+            print('   with upload status: ', status)
+
 
         # tell the queue that the task is done
         q.task_done()
@@ -48,7 +56,8 @@ def main():
     q = JoinableQueue()
 
     # starting up
-    print("Initializing on ", cpu_count(), ' cores')
+    print("\nCurrent time: ", time.strftime('%y-%m-%d %H:%M:%S'))
+    print("Initializing on ", cpu_count(), ' cores...')
 
     # create multiple processing threads
     activeProcesses = []
@@ -59,7 +68,9 @@ def main():
         activeProcesses.append(process)
 
     # starting up
-    print("Adding processes...")
+    print("Adding processes...\n")
+    print('Action \t\t Page \t\t\t\t\t\t\t\t\t Timestamp \t Process ID')
+    print('----------- \t -------------------------------------------------------------------- \t ---------- \t -----------')
 
     for ticker in tickers:
         q.put([0, ticker])
@@ -67,11 +78,11 @@ def main():
     # block until all tasks are done
     q.join()
 
-    # # stop workers
-    # for i in range(numWorkerQueues):
-    #     q.put(None)
-    # for p in activeProcesses:
-    #     p.join()
+    # stop workers
+    for i in range(numWorkerQueues):
+        q.put(None)
+    for p in activeProcesses:
+        p.join()
 
 if __name__ == "__main__":
     main()
