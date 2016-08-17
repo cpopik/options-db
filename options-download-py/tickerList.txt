@@ -1,1 +1,1 @@
-["AAPL", "NLY"]
+["AAPL", "NLY", "MSFT", "TSLA", "IBM", "SCTY", "TWTR"]

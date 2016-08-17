@@ -170,7 +170,10 @@ def daysToExpiry(expiry):
         return 0
 
 def divYield(ticker):
-    return float(Share(ticker).get_dividend_yield())/100
+    try:
+        return float(Share(ticker).get_dividend_yield())/100
+    except:
+        return 0.0
 
 # main thread
 def main():
