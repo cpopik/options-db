@@ -47,7 +47,6 @@ def worker():
 
 def main():
     tickers = getCurrentWeeklyNames()
-    tickers = tickers[0:10]
 
     # create global queue
     global q
