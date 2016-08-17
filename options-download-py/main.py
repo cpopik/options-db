@@ -1,4 +1,5 @@
 from nasdaq import *
+from weeklys import *
 from multiprocessing import Process, JoinableQueue, cpu_count, current_process
 import json
 import time
@@ -45,9 +46,8 @@ def worker():
         q.task_done()
 
 def main():
-    openFile = open('tickerList.txt', 'r+')
-    tickers = json.loads(openFile.read())
-    openFile.close()
+    tickers = getCurrentWeeklyNames()
+    tickers = tickers[0:10]
 
     # create global queue
     global q
