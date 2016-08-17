@@ -39,7 +39,7 @@ def worker():
             print('Calculated:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
 
             status = uploadToSQL(ticker, df)
-            print('Uploaded:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name)
+            print('Uploaded:\t', url, '\t', time.strftime('%H:%M:%S'), '\t', current_process().name, '\t', status)
 
 
         # tell the queue that the task is done
