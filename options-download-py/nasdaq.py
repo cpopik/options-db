@@ -6,7 +6,6 @@ import pandas as pd
 import pymysql
 import threading
 from bs4 import BeautifulSoup
-from configparser import ConfigParser
 
 # date conversion
 from functions import *
@@ -20,15 +19,11 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 # global vars
 columns = ['date','ticker','underlying','contract','type','strike','expiry','last','bid','ask','volume','openInterest']
-
-# read config file
-config = ConfigParser()
-config.read('config.ini')
-host = config.get('SERVER', 'HOST')
-port = int(config.get('SERVER', 'PORT'))
-user = config.get('SERVER', 'USER')
-passwd = config.get('SERVER', 'PASSWD')
-db = config.get('SERVER', 'DB')
+host = 'derivs.xyz'
+port = 3306
+user = 'admin'
+passwd = 'servire87'
+db = 'options-dev'
 
 # set up SQL connection
 conn = pymysql.connect(host=host, port=port, user=user, passwd=passwd, db=db)

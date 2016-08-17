@@ -2,7 +2,6 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from configparser import ConfigParser
 from functions import *
 from scipy.stats import norm
 from scipy.interpolate import interp1d
@@ -13,13 +12,10 @@ from yahoo_finance import Share
 n = norm.pdf
 N = norm.cdf
 
-# read config file
-config = ConfigParser()
-config.read('config.ini')
-DAY_COUNT = float(config.get('SERVER', 'DAY_COUNT'))
-START_VOL = float(config.get('SERVER', 'START_VOL'))
-MAX_ITERATIONS = int(config.get('SERVER', 'MAX_ITERATIONS'))
-PRECISION = float(config.get('SERVER', 'PRECISION'))
+DAY_COUNT = float(360)
+START_VOL = .25
+MAX_ITERATIONS = 25
+PRECISION = .0001
 
 # functions
 def getYieldCurve():
