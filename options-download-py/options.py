@@ -16,10 +16,10 @@ N = norm.cdf
 # read config file
 config = ConfigParser()
 config.read('config.ini')
-DAY_COUNT = float(config.get('OPTIONS', 'DAY_COUNT'))
-START_VOL = float(config.get('OPTIONS', 'START_VOL'))
-MAX_ITERATIONS = int(config.get('OPTIONS', 'MAX_ITERATIONS'))
-PRECISION = float(config.get('OPTIONS', 'PRECISION'))
+DAY_COUNT = float(config.get('SERVER', 'DAY_COUNT'))
+START_VOL = float(config.get('SERVER', 'START_VOL'))
+MAX_ITERATIONS = int(config.get('SERVER', 'MAX_ITERATIONS'))
+PRECISION = float(config.get('SERVER', 'PRECISION'))
 
 # functions
 def getYieldCurve():
