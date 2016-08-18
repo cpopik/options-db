@@ -23,7 +23,7 @@ host = 'derivs.xyz'
 port = 3306
 user = 'admin'
 passwd = 'servire87'
-db = 'options-dev'
+db = 'options-prod'
 
 # set up SQL connection
 conn = pymysql.connect(host=host, port=port, user=user, passwd=passwd, db=db)
