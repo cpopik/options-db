@@ -46,7 +46,7 @@ def worker():
         q.task_done()
 
 def main():
-    tickers = getCurrentWeeklyNames()[0]
+    tickers = getCurrentWeeklyNames()
 
     # create global queue
     global q
